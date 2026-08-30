@@ -1,0 +1,29 @@
+name: p8_estacion_campo
+description: "P8 · Estación de campo conectada (capstone) - Actividad No. 5 SENA ADSO"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^2.5.1
+  dio: ^5.5.0
+  flutter_blue_plus: ^1.32.12
+  nfc_manager: ^3.5.0
+  geolocator: ^12.0.0
+  sensors_plus: ^6.0.1
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  uuid: ^4.4.2
+  connectivity_plus: ^6.0.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

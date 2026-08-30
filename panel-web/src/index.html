@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>P8 · Panel de estación de campo</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { padding: 16px 24px; background: #1e293b; display: flex; align-items: center; gap: 16px; }
+    header input { padding: 6px 10px; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; }
+    header button { padding: 6px 14px; border-radius: 6px; border: none; background: #0ea5e9; color: white; cursor: pointer; }
+    main { padding: 24px; max-width: 900px; margin: 0 auto; }
+    .estado { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-weight: 600; }
+    .ok { background: #064e3b; color: #6ee7b7; }
+    .alerta { background: #7f1d1d; color: #fca5a5; }
+    .metricas { display: flex; gap: 16px; margin-bottom: 16px; }
+    .metrica { flex: 1; background: #1e293b; padding: 16px; border-radius: 8px; text-align: center; }
+    .metrica .valor { font-size: 28px; font-weight: 700; }
+    canvas { background: #1e293b; border-radius: 8px; padding: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>P8 · Panel de campo</strong>
+    <input id="estacionId" placeholder="UUID de la estación" size="38" />
+    <button onclick="suscribir()">Suscribirse</button>
+  </header>
+  <main>
+    <div id="estadoAlerta" class="estado ok">Esperando datos…</div>
+    <div class="metricas">
+      <div class="metrica"><div>Temperatura</div><div class="valor" id="valorTemp">--</div></div>
+      <div class="metrica"><div>Humedad</div><div class="valor" id="valorHum">--</div></div>
+      <div class="metrica"><div>Movimiento</div><div class="valor" id="valorMov">--</div></div>
+    </div>
+    <canvas id="grafica" height="120"></canvas>
+  </main>
+
+  <script>
+    // Base URL relativa: el panel se sirve desde la misma API (/panel).
+    const socket = io('/', { transports: ['websocket'] });
+    const VENTANA_MS = 2 * 60 * 60 * 1000; // últimas dos horas (RF-06)
+
+    const ctx = document.getElementById('grafica').getContext('2d');
+    const grafica = new Chart(ctx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Temperatura °C', data: [], borderColor: '#38bdf8', tension: 0.25 }] },
+      options: {
+        animation: false,
+        scales: {
+          x: { ticks: { color: '#94a3b8' } },
+          y: { ticks: { color: '#94a3b8' } },
+        },
+        plugins: { legend: { labels: { color: '#e2e8f0' } } },
+      },
+    });
+
+    function suscribir() {
+      const id = document.getElementById('estacionId').value.trim();
+      if (!id) return;
+      socket.emit('suscribir', id);
+    }
+
+    socket.on('lectura:nueva', (lectura) => {
+      document.getElementById('valorTemp').textContent = `${lectura.temperatura.toFixed(1)}°C`;
+      document.getElementById('valorHum').textContent = lectura.humedad != null ? `${lectura.humedad.toFixed(0)}%` : '--';
+      document.getElementById('valorMov').textContent = lectura.enMovimiento ? 'Sí' : 'No';
+
+      const estado = document.getElementById('estadoAlerta');
+      if (lectura.alerta) {
+        estado.textContent = `⚠ Alerta: temperatura por encima del umbral (${lectura.temperatura.toFixed(1)}°C)`;
+        estado.className = 'estado alerta';
+      } else {
+        estado.textContent = 'Dentro de rango normal';
+        estado.className = 'estado ok';
+      }
+
+      const ahora = new Date(lectura.medidaEn ?? Date.now());
+      grafica.data.labels.push(ahora.toLocaleTimeString());
+      grafica.data.datasets[0].data.push(lectura.temperatura);
+
+      // RF-06: graficar solo las últimas dos horas.
+      const limite = Date.now() - VENTANA_MS;
+      while (grafica.data.labels.length > 1) {
+        const primeraEtiqueta = grafica.data.labels[0];
+        // Aproximación simple: si hay más de 200 puntos, recorta por cantidad
+        // (el recorte estricto por tiempo requiere guardar timestamps aparte).
+        if (grafica.data.labels.length <= 200) break;
+        grafica.data.labels.shift();
+        grafica.data.datasets[0].data.shift();
+      }
+      grafica.update();
+    });
+  </script>
+</body>
+</html>

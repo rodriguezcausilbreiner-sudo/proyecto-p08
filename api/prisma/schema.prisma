@@ -1,0 +1,38 @@
+// P8 · Estación de campo conectada (capstone)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Estacion {
+  id         String     @id @default(uuid()) @db.Uuid
+  nombreBle  String     @unique @map("nombre_ble") // platformName que anuncia el ESP32
+  ubicacion  String?
+  creadaEn   DateTime   @default(now()) @map("creada_en") @db.Timestamptz
+  lecturas   Lectura[]
+
+  @@map("estacion")
+}
+
+model Lectura {
+  id           String   @id @default(uuid()) @db.Uuid
+  estacionId   String   @map("estacion_id") @db.Uuid
+  estacion     Estacion @relation(fields: [estacionId], references: [id])
+  temperatura  Float
+  humedad      Float?
+  latitud      Float?
+  longitud     Float?
+  enMovimiento Boolean  @default(false) @map("en_movimiento")
+  medidaEn     DateTime @map("medida_en") @db.Timestamptz
+  recibidaEn   DateTime @default(now()) @map("recibida_en") @db.Timestamptz
+  claveCliente String   @map("clave_cliente") // idempotencia, igual que P1
+
+  @@unique([estacionId, claveCliente])
+  @@index([estacionId, medidaEn])
+  @@map("lectura")
+}
